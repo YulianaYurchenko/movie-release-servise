@@ -1,0 +1,27 @@
+type Query {
+  getMovieEpisodes: [MovieEpisode]
+  getMovieEpisode(id: ID!): MovieEpisode
+}
+
+type Mutation {
+  addComment(id: ID!, text: String!): MovieEpisode
+  like(id: ID!): MovieEpisode
+  dislike(id: ID!): MovieEpisode
+}
+
+type Comment {
+  id: ID!
+  text: String!
+}
+
+type MovieEpisode {
+  id: ID!
+  episodeName: String!
+  movieName: String!
+  episodeNumber: Int
+  seasonNumber: Int
+  description: String
+  likes: Int
+  dislikes: Int
+  comments: [Comment]
+}

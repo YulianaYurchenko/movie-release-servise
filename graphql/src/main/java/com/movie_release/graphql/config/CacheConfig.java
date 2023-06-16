@@ -11,6 +11,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 
 import java.time.Duration;
 
@@ -18,7 +20,13 @@ import java.time.Duration;
 @Configuration
 public class CacheConfig {
   @Autowired
-  private CacheProperties properties;
+  private RedisProperties properties;
+
+  @Bean
+  public RedisConnectionFactory redisConnectionFactory() {
+    RedisStandaloneConfiguration redisConfig = new RedisStandaloneConfiguration(properties.getHost(), properties.getPort());
+    return new LettuceConnectionFactory(redisConfig);
+  }
 
   @Bean
   public CacheManager cacheManager(RedisConnectionFactory redisConnectionFactory) {
@@ -31,8 +39,10 @@ public class CacheConfig {
   @Getter
   @Setter
   @Configuration
-  @ConfigurationProperties("spring.redis.cache.expiration")
-  public static class CacheProperties {
-    private Duration expiration = Duration.parse("PT30M");
+  @ConfigurationProperties("spring.redis")
+  public static class RedisProperties {
+    private String host = "localhost";
+    private int port = 6379;
+    private Duration expiration = Duration.parse("PT2M");
   }
 }

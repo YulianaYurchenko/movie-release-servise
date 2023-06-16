@@ -28,70 +28,49 @@ public class MovieReleaseProducer {
 
   @Scheduled(fixedRateString = "${scheduler.interval}")
   public void fetchAndSendNews() {
-    WebDriver main_driver = new FirefoxDriver();
+    WebDriver mainDriver = new FirefoxDriver();
     try {
-      main_driver.get("https://simpsonsua.tv/");
-      WebElement movie_block = main_driver.findElements(By.className("row")).get(3);  // 3 -- "Останні оновлення"
-      List<WebElement> movie_posters = movie_block.findElements(By.className("movie_item"));
-      for (WebElement movie_poster : movie_posters) {
+      mainDriver.get("https://simpsonsua.tv/");
+      WebElement movieBlock = mainDriver.findElements(By.className("row")).get(3);  // 3 -- "Останні оновлення"
 
-        String href = movie_poster.findElement(By.tagName("a")).getAttribute("href");
+      List<WebElement> episodePosters = movieBlock.findElements(By.className("movie_item"));
+      for (WebElement episodePoster : episodePosters) {
 
-        WebDriver movie_driver = new FirefoxDriver();
+        String episode_href = episodePoster.findElement(By.tagName("a")).getAttribute("href");
+
+        WebDriver movieDriver = new FirefoxDriver();
         try {
-          movie_driver.get(href);
+          movieDriver.get(episode_href);
 
-          String episode_name = movie_driver.findElement(By.className("pinktext")).getText();
+          String episodeName = movieDriver.findElement(By.className("pinktext")).getText();
 
-          List<WebElement> header = movie_driver.findElements(By.className("fullstory"));
-          String meta = header.get(0).getText();
-          String[] c = meta.split(" ");
+          List<WebElement> header = movieDriver.findElements(By.className("fullstory"));
 
-          assert c[c.length - 1].equals("українскою");
-          assert c[c.length - 2].equals("серія");
-          assert isNumeric(c[c.length - 3]);
-          assert c[c.length - 4].equals("сезон");
-          assert isNumeric(c[c.length - 5]);
+          String[] metaWords = parseEpisodeMeta(header.get(0).getText());
 
-          String space = "";
-          StringBuilder movie_name_builder = new StringBuilder();
-          for (int i = 0; i < c.length - 5; i++) {
-            movie_name_builder.append(space);
-            movie_name_builder.append(c[i]);
-            space = " ";
-          }
-          String movie_name = movie_name_builder.toString();
-          Integer episode_number = Integer.parseInt(c[c.length - 3]);
-          Integer season_number = Integer.parseInt(c[c.length - 5]);
+          String movieName = parseMovieName(metaWords);
+
+          int l = metaWords.length;
+          Integer episodeNumber = Integer.parseInt(metaWords[l - 3]);
+          Integer seasonNumber = Integer.parseInt(metaWords[l - 5]);
 
           String description = header.get(1).getText();
 
-          int like_number = 0;
-          try {
-            like_number = Integer.parseInt(movie_driver.findElement(By.className("rate-plus")).findElement(By.tagName("span")).getText());
+          Integer likes = parseRate(movieDriver, "rate-plus");
+          Integer dislikes = parseRate(movieDriver, "rate-minus");
 
-          } catch (NoSuchElementException ignored) {
-          }
-          int dislike_number = 0;
-          try {
-
-          dislike_number = Integer.parseInt(movie_driver.findElement(By.className("rate-minus")).findElement(By.tagName("span")).getText());
-
-          } catch (NoSuchElementException ignored) {
-          }
-
-          MovieEpisode movie_episode = new MovieEpisode(episode_name, movie_name, episode_number, season_number,
-                  description, like_number, dislike_number);
-          LOGGER.info("Sending: " + movie_episode);
-          rabbitTemplate.convertAndSend(rabbitConfig.getTopicExchangeName(), rabbitConfig.getRoutingKey(), movie_episode);
+          MovieEpisode movieEpisode = new MovieEpisode(episodeName, movieName, episodeNumber, seasonNumber,
+                  description, likes, dislikes);
+          LOGGER.info("Sending: " + movieEpisode);
+          rabbitTemplate.convertAndSend(rabbitConfig.getTopicExchangeName(), rabbitConfig.getRoutingKey(), movieEpisode);
         }
         finally {
-          movie_driver.close();
+          movieDriver.close();
         }
       }
     }
     finally {
-      main_driver.close();
+      mainDriver.close();
     }
   }
 
@@ -103,6 +82,42 @@ public class MovieReleaseProducer {
     catch(NumberFormatException e) {
       return false;
     }
+  }
+
+  private static Integer parseRate(WebDriver driver, String rateKey) {
+    try {
+
+      String rateText = driver.findElement(By.className(rateKey)).findElement(By.tagName("span")).getText();
+      return Integer.parseInt(rateText);
+
+    } catch (NoSuchElementException ignored) {
+      return 0;
+    }
+  }
+
+  private static String[] parseEpisodeMeta(String meta) {
+    String[] metaWords = meta.split(" ");
+
+    int l = metaWords.length;
+    assert metaWords[l - 1].equals("українскою");
+    assert metaWords[l - 2].equals("серія");
+    assert metaWords[l - 4].equals("сезон");
+    assert isNumeric(metaWords[l - 3]);
+    assert isNumeric(metaWords[l - 5]);
+
+    return metaWords;
+  }
+
+  private static String parseMovieName(String[] metaWords) {
+    String space = "";
+    StringBuilder movieNameBuilder = new StringBuilder();
+
+    for (int i = 0; i < metaWords.length - 5; i++) {
+      movieNameBuilder.append(space);
+      movieNameBuilder.append(metaWords[i]);
+      space = " ";
+    }
+    return movieNameBuilder.toString();
   }
 
 }
